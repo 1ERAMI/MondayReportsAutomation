@@ -26,8 +26,9 @@ def confirm_auth():
     """
     creds = None
     # The file token.pickle stores the user's access and refresh tokens
-    token_path = 'token.pickle'
-    credentials_path = 'credentials.json'
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    token_path = os.path.join(script_dir, 'token.pickle')
+    credentials_path = os.path.join(script_dir, 'credentials.json')
     
     # Check if token.pickle exists
     if os.path.exists(token_path):

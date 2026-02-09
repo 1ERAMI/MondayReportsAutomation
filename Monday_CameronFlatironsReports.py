@@ -358,9 +358,9 @@ def main():
     attachment_folder = SAVE_DIRECTORY
 
     # Email details
-    to_emails = ["aidan@tortintakeprofessionals.com",
+    to_emails = [#"aidan@tortintakeprofessionals.com",
                 #  "martin@tortintakeprofessionals.com",
-                "ngaston@tortintakeprofessionals.com",
+                #"ngaston@tortintakeprofessionals.com",
                 #  "oroman@tortintakeprofessionals.com", 
                 "esteban@tortintakeprofessionals.com" 
                 #  "brittany@tortintakeprofessionals.com", 

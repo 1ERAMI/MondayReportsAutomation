@@ -20,6 +20,11 @@ from openpyxl import load_workbook
 from openpyxl.worksheet.table import Table, TableStyleInfo
 import win32com.client as win32
 import shutil
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
+import tkinter.messagebox as messagebox
+from tkinter import StringVar, BooleanVar
+import threading
 
 # win32.gencache.EnsureDispatch('Excel.Application')
 excel = win32.Dispatch('Excel.Application')
@@ -259,6 +264,233 @@ def format_and_reorder_sheets(file_path, sheet_order):
             excel.Quit()
 
 
+class EmailSenderUI:
+    """Modern UI for selecting email recipients and sending reports"""
+    
+    def __init__(self, available_emails, subject_filters):
+        self.available_emails = available_emails
+        self.subject_filters = subject_filters
+        self.selected_emails = []
+        self.email_vars = {}
+        
+        # Create main window
+        self.root = ttk.Window(themename="darkly")
+        self.root.title("Monday Reports - Email Sender")
+        self.root.geometry("600x700")
+        
+        # Configure grid weights
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(1, weight=1)
+        
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Setup the UI components"""
+        
+        # Header
+        header_frame = ttk.Frame(self.root, padding=20)
+        header_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        
+        title_label = ttk.Label(
+            header_frame,
+            text="📧 Cameron & Crump Reports Sender",
+            font=("Segoe UI", 18, "bold"),
+            bootstyle="inverse-primary"
+        )
+        title_label.pack()
+        
+        subtitle_label = ttk.Label(
+            header_frame,
+            text="Select recipients and send processed reports",
+            font=("Segoe UI", 10)
+        )
+        subtitle_label.pack(pady=(5, 0))
+        
+        # Main content area with scrollbar
+        content_frame = ttk.Frame(self.root)
+        content_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        content_frame.columnconfigure(0, weight=1)
+        content_frame.rowconfigure(0, weight=1)
+        
+        # Canvas and scrollbar for email list
+        canvas = ttk.Canvas(content_frame)
+        scrollbar = ttk.Scrollbar(content_frame, orient="vertical", command=canvas.yview, bootstyle="primary-round")
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Email selection section
+        email_label = ttk.Label(
+            scrollable_frame,
+            text="📬 Available Recipients:",
+            font=("Segoe UI", 12, "bold"),
+            bootstyle="info"
+        )
+        email_label.pack(anchor="w", padx=20, pady=(10, 5))
+        
+        # Create checkboxes for each email
+        for email in self.available_emails:
+            var = BooleanVar(value=True)  # Default to checked
+            self.email_vars[email] = var
+            
+            cb_frame = ttk.Frame(scrollable_frame)
+            cb_frame.pack(fill="x", padx=30, pady=3)
+            
+            cb = ttk.Checkbutton(
+                cb_frame,
+                text=email,
+                variable=var,
+                bootstyle="success-round-toggle"
+            )
+            cb.pack(anchor="w")
+        
+        # Separator
+        sep = ttk.Separator(scrollable_frame, bootstyle="secondary")
+        sep.pack(fill="x", padx=20, pady=15)
+        
+        # Reports section
+        reports_label = ttk.Label(
+            scrollable_frame,
+            text="📊 Reports to Process:",
+            font=("Segoe UI", 12, "bold"),
+            bootstyle="info"
+        )
+        reports_label.pack(anchor="w", padx=20, pady=(5, 5))
+        
+        # Show count of reports
+        count_label = ttk.Label(
+            scrollable_frame,
+            text=f"{len(self.subject_filters)} reports configured",
+            font=("Segoe UI", 9)
+        )
+        count_label.pack(anchor="w", padx=30, pady=(0, 10))
+        
+        # Pack canvas and scrollbar
+        canvas.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        
+        # Status bar
+        self.status_var = StringVar(value="Ready to send reports")
+        self.status_label = ttk.Label(
+            self.root,
+            textvariable=self.status_var,
+            font=("Segoe UI", 9),
+            bootstyle="inverse-secondary",
+            padding=10
+        )
+        self.status_label.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 5))
+        
+        # Buttons frame
+        button_frame = ttk.Frame(self.root, padding=10)
+        button_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=10)
+        
+        # Select/Deselect All buttons
+        select_all_btn = ttk.Button(
+            button_frame,
+            text="✓ Select All",
+            command=self.select_all,
+            bootstyle="info-outline",
+            width=15
+        )
+        select_all_btn.pack(side="left", padx=5)
+        
+        deselect_all_btn = ttk.Button(
+            button_frame,
+            text="✗ Deselect All",
+            command=self.deselect_all,
+            bootstyle="secondary-outline",
+            width=15
+        )
+        deselect_all_btn.pack(side="left", padx=5)
+        
+        # Send button
+        self.send_btn = ttk.Button(
+            button_frame,
+            text="🚀 Send Reports",
+            command=self.on_send,
+            bootstyle="success",
+            width=20
+        )
+        self.send_btn.pack(side="right", padx=5)
+        
+        # Cancel button
+        cancel_btn = ttk.Button(
+            button_frame,
+            text="Cancel",
+            command=self.root.quit,
+            bootstyle="danger-outline",
+            width=15
+        )
+        cancel_btn.pack(side="right", padx=5)
+    
+    def select_all(self):
+        """Select all email checkboxes"""
+        for var in self.email_vars.values():
+            var.set(True)
+        self.status_var.set(f"Selected all {len(self.email_vars)} recipients")
+    
+    def deselect_all(self):
+        """Deselect all email checkboxes"""
+        for var in self.email_vars.values():
+            var.set(False)
+        self.status_var.set("All recipients deselected")
+    
+    def on_send(self):
+        """Handle send button click"""
+        # Get selected emails
+        self.selected_emails = [email for email, var in self.email_vars.items() if var.get()]
+        
+        if not self.selected_emails:
+            messagebox.showwarning(
+                "No Recipients",
+                "Please select at least one recipient."
+            )
+            return
+        
+        # Confirm send
+        count = len(self.selected_emails)
+        confirm = messagebox.askyesno(
+            "Confirm Send",
+            f"Send reports to {count} recipient(s)?\n\n" + "\n".join(self.selected_emails)
+        )
+        
+        if confirm:
+            self.status_var.set("Processing reports... Please wait.")
+            self.send_btn.config(state="disabled")
+            self.root.update()
+            
+            # Run main process in thread to keep UI responsive
+            thread = threading.Thread(target=self.run_process)
+            thread.start()
+    
+    def run_process(self):
+        """Run the report processing in a separate thread"""
+        try:
+            main(self.selected_emails, self.status_callback)
+            self.root.after(100, lambda: self.status_var.set("✓ Reports sent successfully!"))
+            self.root.after(100, lambda: messagebox.showinfo("Success", "Reports sent successfully!"))
+        except Exception as e:
+            self.root.after(100, lambda: self.status_var.set(f"✗ Error: {str(e)}"))
+            self.root.after(100, lambda: messagebox.showerror("Error", f"An error occurred:\n{str(e)}"))
+        finally:
+            self.root.after(100, lambda: self.send_btn.config(state="normal"))
+    
+    def status_callback(self, message):
+        """Update status from background thread"""
+        self.root.after(100, lambda: self.status_var.set(message))
+    
+    def run(self):
+        """Start the UI"""
+        self.root.mainloop()
+        return self.selected_emails
+
+
 def send_email_with_attachments(gservice, to_emails, subject, body, attachment_folder):
     try:
         if isinstance(to_emails, list):
@@ -291,9 +523,13 @@ def send_email_with_attachments(gservice, to_emails, subject, body, attachment_f
 
 
 # Main function
-def main():
+def main(to_emails=None, status_callback=None):
     """
     Main function to execute the script for multiple reports and send an email with the processed files.
+    
+    Args:
+        to_emails: List of email addresses to send to (optional)
+        status_callback: Function to call with status updates (optional)
     """
 
     # Clear directory before processing new reports
@@ -331,16 +567,17 @@ def main():
     # Folder to save processed files
     attachment_folder = SAVE_DIRECTORY
 
-    # Email details
-    to_emails = [
-    "aidan@tortintakeprofessionals.com",
-    "martin@tortintakeprofessionals.com",
-    # "oroman@tortintakeprofessionals.com",
-    # "pjerome@tortintakeprofessionals.com",
-    "esteban@tortintakeprofessionals.com"
-    # "brittany@tortintakeprofessionals.com",
-    # "jackson@tortintakeprofessionals.com"
-    ]  # Add recipient emails
+    # Email details - use provided emails or defaults
+    if to_emails is None:
+        to_emails = [
+            "aidan@tortintakeprofessionals.com",
+            "martin@tortintakeprofessionals.com",
+            "oroman@tortintakeprofessionals.com",
+            "pjerome@tortintakeprofessionals.com",
+            "esteban@tortintakeprofessionals.com",
+            "brittany@tortintakeprofessionals.com",
+            "jackson@tortintakeprofessionals.com"
+        ]
     email_subject = "Cameron & Crump's Reports"
     email_body = (
         "Hello,\n\n"
@@ -350,8 +587,12 @@ def main():
     )
 
     # Process each report
-    for subject_filter in subject_filters:
-        print(f"Processing report for: {subject_filter}")
+    for idx, subject_filter in enumerate(subject_filters, 1):
+        status_msg = f"Processing report {idx}/{len(subject_filters)}: {subject_filter[:50]}..."
+        print(status_msg)
+        if status_callback:
+            status_callback(status_msg)
+        
         file_path = get_report_email(gservice, subject_filter)
         if file_path:
             try:
@@ -378,15 +619,45 @@ def main():
 
     # Send an email with all processed files
     try:
-        print("Sending email with attachments...")
+        send_msg = "Sending email with attachments..."
+        print(send_msg)
+        if status_callback:
+            status_callback(send_msg)
+        
         send_email_with_attachments(gservice, to_emails, email_subject, email_body, attachment_folder)
     except Exception as e:
         print(f"Error sending email: {e}")
 
     print("All reports processed and email sent successfully.")
 
+def launch_ui():
+    """Launch the UI for email selection"""
+    # Available email addresses
+    available_emails = [
+        "aidan@tortintakeprofessionals.com",
+        "martin@tortintakeprofessionals.com",
+        "oroman@tortintakeprofessionals.com",
+        "pjerome@tortintakeprofessionals.com",
+        "esteban@tortintakeprofessionals.com",
+        "brittany@tortintakeprofessionals.com",
+        "jackson@tortintakeprofessionals.com"
+    ]
+    
+    # Subject filters for reports
+    subject_filters = [
+        "Report: BCL: Chowchilla Womens Prison Abuse - ACTS - Crump",
+        "Report: BCL: Illinois Juvenile Hall Abuse - Crump - Slater",
+        "Report: CAM: Nursing Home & Assisted Living Abuse - MRW - MRW"
+    ]
+    
+    # Create and run UI
+    ui = EmailSenderUI(available_emails, subject_filters)
+    ui.run()
+
+
 if __name__ == "__main__":
-    main()
+    # Launch UI instead of running directly
+    launch_ui()
 
 
 
