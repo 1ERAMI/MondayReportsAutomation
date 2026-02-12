@@ -106,6 +106,42 @@ def extract_date_from_filename(filename):
     return match.group(1) if match else None
 
 
+def find_existing_file(service, folder_id, filename):
+    """
+    Check if a file with the same name already exists in the folder.
+    
+    Args:
+        service: Google Drive API service
+        folder_id: ID of the folder to search in
+        filename: Name of the file to search for
+    
+    Returns:
+        File ID if found, None otherwise
+    """
+    # Escape single quotes in filename for query
+    escaped_filename = filename.replace("'", "\\'")
+    
+    query = (
+        f"'{folder_id}' in parents "
+        f"and name = '{escaped_filename}' "
+        f"and trashed = false"
+    )
+    
+    try:
+        results = service.files().list(
+            q=query,
+            fields='files(id, name, modifiedTime)',
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True
+        ).execute()
+        
+        files = results.get('files', [])
+        return files[0]['id'] if files else None
+    except Exception as e:
+        print(f"Warning: Could not check for existing file: {e}")
+        return None
+
+
 def upload_file_to_drive(file_path, folder_name, status_callback=None, target_folder_id=None):
     """
     Upload a file to the specified Google Drive folder.
@@ -134,29 +170,53 @@ def upload_file_to_drive(file_path, folder_name, status_callback=None, target_fo
         
         # File metadata
         file_name = os.path.basename(file_path)
-        file_metadata = {
-            'name': file_name,
-            'parents': [folder_id]
-        }
         
-        # Upload file
-        msg = f"📤 Uploading {file_name} to Drive..."
-        print(msg)
-        if status_callback:
-            status_callback(msg)
+        # Check if file already exists in this folder
+        existing_file_id = find_existing_file(service, folder_id, file_name)
         
         media = MediaFileUpload(file_path, resumable=True)
-        uploaded_file = service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields='id, name, webViewLink',
-            supportsAllDrives=True
-        ).execute()
         
-        msg = f"✅ Uploaded: {file_name} (ID: {uploaded_file.get('id')})"
-        print(msg)
-        if status_callback:
-            status_callback(msg)
+        if existing_file_id:
+            # Update existing file
+            msg = f"🔄 Updating existing file: {file_name}..."
+            print(msg)
+            if status_callback:
+                status_callback(msg)
+            
+            uploaded_file = service.files().update(
+                fileId=existing_file_id,
+                media_body=media,
+                fields='id, name, webViewLink',
+                supportsAllDrives=True
+            ).execute()
+            
+            msg = f"✅ Updated: {file_name} (ID: {uploaded_file.get('id')})"
+            print(msg)
+            if status_callback:
+                status_callback(msg)
+        else:
+            # Create new file
+            msg = f"📤 Uploading {file_name} to Drive..."
+            print(msg)
+            if status_callback:
+                status_callback(msg)
+            
+            file_metadata = {
+                'name': file_name,
+                'parents': [folder_id]
+            }
+            
+            uploaded_file = service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id, name, webViewLink',
+                supportsAllDrives=True
+            ).execute()
+            
+            msg = f"✅ Uploaded: {file_name} (ID: {uploaded_file.get('id')})"
+            print(msg)
+            if status_callback:
+                status_callback(msg)
         
         return True
         
@@ -237,12 +297,37 @@ def upload_folder_to_drive(folder_path, folder_name, status_callback=None):
     
     # Upload each file
     success_count = 0
+    update_count = 0
+    new_count = 0
+    
     for xlsx_file in xlsx_files:
         file_path = os.path.join(folder_path, xlsx_file)
-        if upload_file_to_drive(file_path, folder_name, status_callback, target_folder_id=target_folder_id):
-            success_count += 1
+        
+        # Check if file exists before uploading
+        try:
+            service = get_drive_service()
+            existing = find_existing_file(service, target_folder_id, xlsx_file)
+            
+            if upload_file_to_drive(file_path, folder_name, status_callback, target_folder_id=target_folder_id):
+                success_count += 1
+                if existing:
+                    update_count += 1
+                else:
+                    new_count += 1
+        except Exception as e:
+            print(f"Error processing {xlsx_file}: {e}")
+            if status_callback:
+                status_callback(f"Error processing {xlsx_file}: {e}")
     
-    msg = f"✅ Successfully uploaded {success_count}/{len(xlsx_files)} files to Drive"
+    # Summary message
+    summary_parts = []
+    if new_count > 0:
+        summary_parts.append(f"{new_count} new")
+    if update_count > 0:
+        summary_parts.append(f"{update_count} updated")
+    
+    summary = " and ".join(summary_parts) if summary_parts else "0"
+    msg = f"✅ Successfully uploaded {success_count}/{len(xlsx_files)} files ({summary})"
     print(msg)
     if status_callback:
         status_callback(msg)
