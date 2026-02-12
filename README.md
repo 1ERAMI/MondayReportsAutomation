@@ -12,19 +12,45 @@ This project automates the weekly Monday reports workflow by:
 
 ---
 
+## 🎯 Quick Start
+
+### **Unified UI (Recommended)**
+Run the unified interface to process any or all report types:
+```bash
+python MondayReportsUI.py
+```
+**Features:**
+- ✅ Select multiple report types (runs sequentially)
+- ✅ Choose recipients with checkboxes
+- ✅ Modern dark-themed interface
+- ✅ Live progress updates
+
+### **Individual Scripts**
+Each report can still be run independently:
+```bash
+python Monday_Andy&GregReports.py
+python Monday_CameronFlatironsReports.py
+python Monday_CamCrumpReports.py
+python Monday_MalissaReports.py
+```
+
+---
+
 ## 📁 Project Structure
 
 ```
-CIR_Monday-Reports/
-├── Monday_Andy&GregReports.py          # Andy & Greg's reports automation
-├── Monday_MalissaReports.py            # Malissa's reports automation
-├── Monday_CamCrumpReports.py           # Cameron & Crump reports automation
-├── Monday_CameronFlatironsReports.py   # Cameron Flatirons reports automation
+IND_Tools/
+├── MondayReportsUI.py                  # 🆕 Unified UI for all reports (USE THIS)
+├── Monday_Andy&GregReports.py          # Andy & Greg's reports (120 reports)
+├── Monday_MalissaReports.py            # Malissa's reports (23 reports)
+├── Monday_CamCrumpReports.py           # Cameron & Crump reports (3 reports)
+├── Monday_CameronFlatironsReports.py   # Cameron Flatirons reports (56 reports)
 ├── RepAutoGmail.py                     # Gmail API authentication module
 ├── Fix_defaultColWidthPt.py            # Excel column width fixer module
 ├── credentials.json                    # Google API OAuth credentials
 ├── token.pickle                        # Cached authentication token
-└── .venv/                              # Python virtual environment
+├── requirements.txt                    # Python dependencies
+└── __pycache__/                        # Python cache files
 ```
 
 ---
@@ -38,13 +64,19 @@ CIR_Monday-Reports/
 
 ### 2. Install Dependencies
 
-The virtual environment is already set up. Packages installed:
+Install from requirements.txt:
+```bash
+pip install -r requirements.txt
+```
+
+**Key packages:**
 - `google-auth-oauthlib` - Gmail OAuth authentication
 - `google-auth-httplib2` - HTTP library for Google API
 - `google-api-python-client` - Gmail API client
 - `pandas` - Data manipulation
 - `openpyxl` - Excel file handling
 - `pywin32` - Windows COM automation for Excel
+- `ttkbootstrap` - Modern themed UI components
 
 ### 3. Gmail API Setup
 
@@ -52,6 +84,29 @@ Already configured with `credentials.json`. On first run, the script will:
 1. Open a browser window for Gmail authentication
 2. Ask you to grant permissions (read, modify, send emails)
 3. Save authentication token to `token.pickle` for future runs
+
+---
+
+## 🎨 Unified UI Architecture
+
+**MondayReportsUI.py** - Master interface for all report types
+
+**Key Features:**
+- Multi-select checkboxes for report types (can run multiple sequentially)
+- Dynamic recipient list (shows union of emails from selected reports)
+- Select All/Deselect All buttons for both reports and recipients
+- Each report's `main()` function accepts `to_emails` and `status_callback` parameters
+- Runs reports one after another when multiple selected
+- Live status updates during processing
+
+**How it works:**
+1. Dynamically imports all 4 Monday report modules using `importlib`
+2. User selects report type(s) via checkboxes
+3. Recipient list updates based on selected report(s)
+4. Calls each selected module's `main(to_emails, status_callback)` function
+5. Processes reports sequentially with progress updates
+
+**Individual report files retain their standalone UI** for backward compatibility.
 
 ---
 
