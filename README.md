@@ -23,7 +23,7 @@ python MondayReportsUI.py
 **Features:**
 - ✅ Select multiple report types (runs sequentially)
 - ✅ Choose recipients with checkboxes  
-- ✅ Email and/or Google Drive delivery
+- ✅ Email and/or Google Drive delivery (**Drive is default**)
 - ✅ Automatic date-based folder organization in Drive
 - ✅ Real-time upload progress for large files
 - ✅ Comprehensive activity logging (`drive_uploads.log`)
