@@ -40,7 +40,8 @@ import threading
 # excel = win32.Dispatch('Excel.Application')
 gservice = RAGA.confirm_auth()
 
-SAVE_DIRECTORY = "C:\\Users\\Esteban\\Desktop\\Working\\Python Outputs\\Malissa"
+# Dynamic path that works on any Windows machine
+SAVE_DIRECTORY = os.path.join(os.path.expanduser("~"), "Desktop", "Working", "Python Outputs", "Malissa")
 
 
 def get_target_date():
